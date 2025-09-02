@@ -1,0 +1,5 @@
+backend/model/moodify_model/
+*.zip
+*.bin
+
+*.safetensors
