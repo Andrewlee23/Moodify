@@ -18,12 +18,41 @@ function App() {
         style={{ whiteSpace: "pre-line", display: "block" }}
       />
       <TypeAnimation
-        sequence={[2000, "How is the world feeling today?", 2000]}
+        sequence={[ "How is the world feeling today?"]}
         wrapper="h2"
         cursor={true}
         style={{ whiteSpace: "pre-line", display: "block" }}
       />
-
+    {/* Top-right button */}
+    <a 
+      href="/faq" 
+      style={{
+        position: "absolute",
+        top: "20px",
+        right: "20px",
+        padding: "10px 20px",
+        backgroundColor: "#fff",
+        color: "#000",
+        fontFamily: "Cutive Mono, monospace",
+        fontSize: "16px",
+        fontWeight: "bold",
+        border: "2px solid #fff",
+        borderRadius: "6px",
+        textDecoration: "none",
+        cursor: "pointer",
+        transition: "0.3s",
+      }}
+      onMouseEnter={(e) => {
+        e.target.style.backgroundColor = "#000";
+        e.target.style.color = "#fff";
+      }}
+      onMouseLeave={(e) => {
+        e.target.style.backgroundColor = "#fff";
+        e.target.style.color = "#000";
+      }}
+    >
+      What is this?
+    </a>
       <MoodChart />
     </div>
   );
