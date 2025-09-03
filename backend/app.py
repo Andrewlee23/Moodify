@@ -17,6 +17,7 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
+   
         CREATE TABLE IF NOT EXISTS posts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             platform TEXT,
@@ -44,6 +45,9 @@ async def predict_text(request: Request):
     if not text:
         return {"error": "No text provided"}
     return predict(text)
+
+from collections import Counter
+import sqlite3
 
 @app.get("/mood-distribution")
 def mood_distribution():

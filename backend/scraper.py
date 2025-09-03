@@ -27,6 +27,7 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
+
         CREATE TABLE IF NOT EXISTS posts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             source TEXT,
@@ -37,14 +38,23 @@ def init_db():
     """)
     conn.commit()
     conn.close()
-
-def save_post(source, content, prediction):
+def clear_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM posts") 
+    conn.commit()
+    conn.close()
+def save_post(source: str, content: str, pred: dict):
     try:
+        label = pred.get("label")
+        if not label:
+            return  # skip if model didn’t return a label
+
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute(
             "INSERT INTO posts (source, content, prediction) VALUES (?, ?, ?)",
-            (source, content, prediction)
+            (source, content, label)  
         )
         conn.commit()
         conn.close()
@@ -64,7 +74,6 @@ def scrape_twitter_top(limit=10):
     posts = []
     try:
         tweets = client.search_recent_tweets(query="*", max_results=10, tweet_fields=["lang"])
-        time.sleep(5)
         print(tweets)
         for tweet in tweets.data[:limit]:
             posts.append(tweet.text)
@@ -90,14 +99,14 @@ def get_prediction(post):
 
 def run_scraper():
     print("Scraper running...")
-
+    clear_db()
     reddit_posts = scrape_reddit_top()
     twitter_posts = scrape_twitter_top()
 
     for post in reddit_posts:
         pred = get_prediction(post)
         if pred:
-            save_post("reddit", post, str(pred))
+            save_post("reddit", post, pred)
 
     for post in twitter_posts:
         pred = get_prediction(post)
