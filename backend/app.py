@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import sqlite3
 import os
 
-DB_PATH = os.getenv("DB_PATH", "./moodify.db")
+DB_PATH = os.getenv("DB_PATH", "./scraper.db")
 
 app = FastAPI()
 
@@ -31,12 +31,17 @@ def init_db():
 def startup_event():
     init_db()
 
-@app.post("/predict/")
-def save_post(post: Post):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("INSERT INTO posts (platform, text, label) VALUES (?, ?, ?)",
-              (post.platform, post.text, post.label))
-    conn.commit()
-    conn.close()
-    return {"status": "ok", "saved": post}
+from fastapi import FastAPI, Request
+from predict import predict
+
+app = FastAPI()
+
+@app.post("/predict")
+async def predict_text(request: Request):
+    payload = await request.json()
+    text = payload.get("text", "")
+    if not text:
+        return {"error": "No text provided"}
+    return predict(text)
+
+
