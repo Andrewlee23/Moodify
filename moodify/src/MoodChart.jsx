@@ -11,7 +11,7 @@ export default function MoodChart() {
         const distribution = json.distribution;
         const chartData = Object.keys(distribution).map((mood) => ({
           mood,
-          percentage: distribution[mood], // <-- match here
+          percentage: distribution[mood], // match here
         }));
         setData(chartData);
       })
