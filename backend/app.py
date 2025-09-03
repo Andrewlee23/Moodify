@@ -1,17 +1,71 @@
+from collections import Counter
 from fastapi import FastAPI
 from pydantic import BaseModel
+import sqlite3
+import os
+
+DB_PATH = os.getenv("DB_PATH", "./scraper.db")
+
+app = FastAPI()
+
+class Post(BaseModel):
+    platform: str
+    text: str
+    label: str
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+   
+        CREATE TABLE IF NOT EXISTS posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            platform TEXT,
+            text TEXT,
+            label TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+@app.on_event("startup")
+def startup_event():
+    init_db()
+
+from fastapi import FastAPI, Request
 from predict import predict
 
 app = FastAPI()
 
-class TextInput(BaseModel):
-    text: str
-
 @app.post("/predict")
-def predict_mood(input: TextInput):
-    result = predict(input.text)
-    return result
+async def predict_text(request: Request):
+    payload = await request.json()
+    text = payload.get("text", "")
+    if not text:
+        return {"error": "No text provided"}
+    return predict(text)
 
-@app.get("/")
-def root():
-    return {"status": "ok", "message": "Moodify REST API running"}
+from collections import Counter
+import sqlite3
+
+@app.get("/mood-distribution")
+def mood_distribution():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("SELECT prediction FROM posts")
+    rows = cur.fetchall()
+    conn.close()
+
+    labels = [r[0] for r in rows if r[0] not in (None, "error")]
+    counts = Counter(labels)
+    total = sum(counts.values())
+
+    distribution = {
+        mood: round((count / total) * 100, 2) if total > 0 else 0.0
+        for mood, count in counts.items()
+    }
+
+    return {"total": total, "distribution": distribution}
+
+
