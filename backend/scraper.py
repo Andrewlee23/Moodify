@@ -1,90 +1,73 @@
 import os
-import time
 import praw
 import tweepy
-import sqlite3
 import requests
-from dotenv import load_dotenv
+import schedule
+import time
+import pytz
+from datetime import datetime
+from predict import get_prediction
 
-# Load env
-load_dotenv()
+API_URL = "http://127.0.0.1:8000/predict/"
 
-# --- Reddit Setup ---
 reddit = praw.Reddit(
     client_id=os.getenv("REDDIT_CLIENT_ID"),
-    client_secret=os.getenv("REDDIT_SECRET"),
+    client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
     user_agent=os.getenv("REDDIT_USER_AGENT")
 )
 
-twitter_client = tweepy.Client(bearer_token=os.getenv("TWITTER_BEARER_TOKEN"))
-
-DB_PATH = "scraped.db"
-conn = sqlite3.connect(DB_PATH)
-cursor = conn.cursor()
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS posts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source TEXT,
-    title TEXT,
-    timestamp TEXT,
-    prediction TEXT
+twitter_client = tweepy.Client(
+    bearer_token=os.getenv("TWITTER_BEARER_TOKEN")
 )
-""")
-conn.commit()
 
-def save_post_to_db(post, prediction):
-    cursor.execute(
-        "INSERT INTO posts (source, title, timestamp, prediction) VALUES (?, ?, ?, ?)",
-        (post["source"], post["title"], str(post["timestamp"]), prediction)
-    )
-    conn.commit()
-
-def send_to_ml_api(text):
-    url = os.getenv("ML_API_URL")
+def save_post(platform, text, label):
+    payload = {"platform": platform, "text": text, "label": label}
     try:
-        res = requests.post(url, json={"text": text})
-        if res.status_code == 200:
-            return res.json().get("label", "unknown")
-        return "error"
+        r = requests.post(API_URL, json=payload)
+        r.raise_for_status()
     except Exception as e:
-        print("ML API error:", e)
-        return "error"
+        print("Failed to save post:", e)
+
 def scrape_reddit_top(limit=20):
-    results = []
-    for post in reddit.subreddit("all").hot(limit=limit):
-        results.append({
-            "source": "reddit",
-            "title": post.title,
-            "timestamp": post.created_utc
-        })
-    return results
+    posts = []
+    try:
+        for submission in reddit.subreddit("all").hot(limit=limit):
+            posts.append(submission.title)
+    except Exception as e:
+        print("Reddit scrape failed:", e)
+    return posts
 
 def scrape_twitter_top(limit=20):
-    query = "lang:en -is:retweet"
-    tweets = twitter_client.search_recent_tweets(
-        query=query,
-        max_results=limit,
-        tweet_fields=["created_at", "text"]
-    )
-    results = []
-    if tweets.data:
-        for tweet in tweets.data:
-            results.append({
-                "source": "twitter",
-                "title": tweet.text,
-                "timestamp": tweet.created_at
-            })
-    return results
+    posts = []
+    try:
+        trends = twitter_client.get_place_trends(1)  
+        for t in trends[0]["trends"][:limit]:
+            posts.append(t["name"])
+    except Exception as e:
+        print("Twitter scrape failed:", e)
+    return posts
+
 def run_scraper():
-    print("Scraper running...")
-    posts = scrape_reddit_top() + scrape_twitter_top()
-    for post in posts:
-        pred = send_to_ml_api(post["title"])
-        save_post_to_db(post, pred)
-        print(f"[{post['source']}] {post['title']} -> {pred}")
+    print("🔄 Scraper running...")
+    reddit_posts = scrape_reddit_top()
+    twitter_posts = scrape_twitter_top()
+    for post in reddit_posts:
+        label = get_prediction(post)
+        save_post("reddit", post, label)
+    for post in twitter_posts:
+        label = get_prediction(post)
+        save_post("twitter", post, label)
+    print(f"saved {len(reddit_posts) + len(twitter_posts)} posts.")
+
+def job():
+    est = pytz.timezone("US/Eastern")
+    now = datetime.now(est).strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{now}] Running daily scrape...")
+    run_scraper()
 
 if __name__ == "__main__":
+    schedule.every().day.at("00:00").do(job)
+    print("Scraper scheduled for midnight EST daily...")
     while True:
-        run_scraper()
-        print("Sleeping 30 minutes...")
-        time.sleep(1800)
+        schedule.run_pending()
+        time.sleep(30)
