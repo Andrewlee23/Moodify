@@ -1,3 +1,4 @@
+from collections import Counter
 from fastapi import FastAPI
 from pydantic import BaseModel
 import sqlite3
@@ -43,5 +44,25 @@ async def predict_text(request: Request):
     if not text:
         return {"error": "No text provided"}
     return predict(text)
+
+@app.get("/mood-distribution")
+def mood_distribution():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT prediction FROM posts")
+    rows = cursor.fetchall()
+    conn.close()
+
+    predictions = [r[0] for r in rows if r[0] not in (None, "error")]
+
+    counts = Counter(predictions)
+    total = sum(counts.values())
+
+    distribution = {
+        mood: round((count / total) * 100, 2) if total > 0 else 0
+        for mood, count in counts.items()
+    }
+
+    return {"total": total, "distribution": distribution}
 
 

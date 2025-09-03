@@ -63,7 +63,9 @@ def scrape_reddit_top(limit=50):
 def scrape_twitter_top(limit=10):
     posts = []
     try:
-        tweets = client.search_recent_tweets(query="*", max_results=50, tweet_fields=["lang"])
+        tweets = client.search_recent_tweets(query="*", max_results=10, tweet_fields=["lang"])
+        time.sleep(5)
+        print(tweets)
         for tweet in tweets.data[:limit]:
             posts.append(tweet.text)
     except Exception as e:
