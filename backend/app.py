@@ -1,26 +1,23 @@
-from collections import Counter
-from fastapi import FastAPI
-from pydantic import BaseModel
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import sqlite3
 import os
+from collections import Counter
+from predict import predict
 
 DB_PATH = os.getenv("DB_PATH", "./scraper.db")
 
-app = FastAPI()
-
-class Post(BaseModel):
-    platform: str
-    text: str
-    label: str
+app = Flask(__name__)
+CORS(app, origins=["http://localhost:3000"])  # frontend
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    c.execute("DROP TABLE IF EXISTS posts")
     c.execute("""
-   
-        CREATE TABLE IF NOT EXISTS posts (
+        CREATE TABLE posts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            platform TEXT,
+            source TEXT,
             text TEXT,
             label TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -29,31 +26,36 @@ def init_db():
     conn.commit()
     conn.close()
 
-@app.on_event("startup")
-def startup_event():
-    init_db()
+@app.before_request
+def before_request():
+    # initialize DB if it doesn't exist
+    if not os.path.exists(DB_PATH):
+        init_db()
 
-from fastapi import FastAPI, Request
-from predict import predict
-
-app = FastAPI()
-
-@app.post("/predict")
-async def predict_text(request: Request):
-    payload = await request.json()
-    text = payload.get("text", "")
+@app.route("/predict", methods=["POST"])
+def predict_text():
+    data = request.json
+    text = data.get("text", "")
     if not text:
-        return {"error": "No text provided"}
-    return predict(text)
+        return jsonify({"error": "No text provided"}), 400
 
-from collections import Counter
-import sqlite3
+    result = predict(text)
 
-@app.get("/mood-distribution")
+    # store in DB
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT INTO posts (source, text, label) VALUES (?, ?, ?)",
+              ("api", text, result["label"]))
+    conn.commit()
+    conn.close()
+
+    return jsonify(result)
+
+@app.route("/mood-distribution", methods=["GET"])
 def mood_distribution():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute("SELECT prediction FROM posts")
+    cur.execute("SELECT label FROM posts")
     rows = cur.fetchall()
     conn.close()
 
@@ -66,6 +68,8 @@ def mood_distribution():
         for mood, count in counts.items()
     }
 
-    return {"total": total, "distribution": distribution}
+    return jsonify({"total": total, "distribution": distribution})
 
-
+if __name__ == "__main__":
+    init_db()
+    app.run(host="127.0.0.1", port=8000, debug=True)
