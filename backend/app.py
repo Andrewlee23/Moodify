@@ -52,18 +52,17 @@ import sqlite3
 @app.get("/mood-distribution")
 def mood_distribution():
     conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT prediction FROM posts")
-    rows = cursor.fetchall()
+    cur = conn.cursor()
+    cur.execute("SELECT prediction FROM posts")
+    rows = cur.fetchall()
     conn.close()
 
-    predictions = [r[0] for r in rows if r[0] not in (None, "error")]
-
-    counts = Counter(predictions)
+    labels = [r[0] for r in rows if r[0] not in (None, "error")]
+    counts = Counter(labels)
     total = sum(counts.values())
 
     distribution = {
-        mood: round((count / total) * 100, 2) if total > 0 else 0
+        mood: round((count / total) * 100, 2) if total > 0 else 0.0
         for mood, count in counts.items()
     }
 
