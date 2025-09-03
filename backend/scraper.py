@@ -1,59 +1,90 @@
 import os
-import requests
-import snscrape.modules.twitter as sntwitter
+import time
 import praw
-from apscheduler.schedulers.blocking import BlockingScheduler
+import tweepy
+import sqlite3
+import requests
 from dotenv import load_dotenv
+
+# Load env
 load_dotenv()
 
-API_URL = "http://127.0.0.1:8000/predict"  
-def scrape_twitter_top(n=20):
-    tweets = []
-    for i, tweet in enumerate(sntwitter.TwitterSearchScraper("lang:en").get_items()):
-        if i >= n:
-            break
-        tweets.append(tweet.content) 
-    return tweets
-def scrape_reddit_top(n=20):
-    reddit = praw.Reddit(
-        client_id=os.getenv("REDDIT_CLIENT_ID"),
-        client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
-        user_agent=os.getenv("REDDIT_USER_AGENT")
+# --- Reddit Setup ---
+reddit = praw.Reddit(
+    client_id=os.getenv("REDDIT_CLIENT_ID"),
+    client_secret=os.getenv("REDDIT_SECRET"),
+    user_agent=os.getenv("REDDIT_USER_AGENT")
+)
+
+twitter_client = tweepy.Client(bearer_token=os.getenv("TWITTER_BEARER_TOKEN"))
+
+DB_PATH = "scraped.db"
+conn = sqlite3.connect(DB_PATH)
+cursor = conn.cursor()
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT,
+    title TEXT,
+    timestamp TEXT,
+    prediction TEXT
+)
+""")
+conn.commit()
+
+def save_post_to_db(post, prediction):
+    cursor.execute(
+        "INSERT INTO posts (source, title, timestamp, prediction) VALUES (?, ?, ?, ?)",
+        (post["source"], post["title"], str(post["timestamp"]), prediction)
     )
-    posts = []
-    for submission in reddit.subreddit("all").hot(limit=n):
-        posts.append(submission.title) 
-    return posts
-def analyze_posts(posts, source):
+    conn.commit()
+
+def send_to_ml_api(text):
+    url = os.getenv("ML_API_URL")
+    try:
+        res = requests.post(url, json={"text": text})
+        if res.status_code == 200:
+            return res.json().get("label", "unknown")
+        return "error"
+    except Exception as e:
+        print("ML API error:", e)
+        return "error"
+def scrape_reddit_top(limit=20):
     results = []
-    for post in posts:
-        try:
-            response = requests.post(API_URL, json={"text": post})
-            if response.status_code == 200:
-                mood = response.json()
-                results.append({
-                    "text": post,
-                    "mood": mood["label"],
-                    "source": source
-                })
-        except Exception as e:
-            print(f"Error analyzing: {e}")
+    for post in reddit.subreddit("all").hot(limit=limit):
+        results.append({
+            "source": "reddit",
+            "title": post.title,
+            "timestamp": post.created_utc
+        })
     return results
 
+def scrape_twitter_top(limit=20):
+    query = "lang:en -is:retweet"
+    tweets = twitter_client.search_recent_tweets(
+        query=query,
+        max_results=limit,
+        tweet_fields=["created_at", "text"]
+    )
+    results = []
+    if tweets.data:
+        for tweet in tweets.data:
+            results.append({
+                "source": "twitter",
+                "title": tweet.text,
+                "timestamp": tweet.created_at
+            })
+    return results
 def run_scraper():
-    print("Running scraper...")
+    print("Scraper running...")
+    posts = scrape_reddit_top() + scrape_twitter_top()
+    for post in posts:
+        pred = send_to_ml_api(post["title"])
+        save_post_to_db(post, pred)
+        print(f"[{post['source']}] {post['title']} -> {pred}")
 
-    tweets = scrape_twitter_top()
-    reddit_posts = scrape_reddit_top()
-
-    tweet_results = analyze_posts(tweets, "twitter")
-    reddit_results = analyze_posts(reddit_posts, "reddit")
-
-    print("Twitter:", tweet_results[:3])  # preview first 3
-    print("Reddit:", reddit_results[:3])
 if __name__ == "__main__":
-    scheduler = BlockingScheduler()
-    scheduler.add_job(run_scraper, "interval", minutes=30)  # or hours=1
-    print(" Scraper running every 30 minutes...")
-    run_scraper()  # run once at start
-    scheduler.start()
+    while True:
+        run_scraper()
+        print("Sleeping 30 minutes...")
+        time.sleep(1800)
