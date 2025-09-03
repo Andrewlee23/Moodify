@@ -1,8 +1,15 @@
-pandas
-numpy
-scikit-learn
-transformers
-torch
-datasets
-flask
-flask-cors
+# im adding versions cus im getting headache
+torch==2.2.2+cu118
+torchvision==0.17.2+cu118
+torchaudio==2.2.2+cu118
+--extra-index-url https://download.pytorch.org/whl/cu118
+transformers==4.39.3
+datasets==2.18.0
+evaluate==0.4.1
+accelerate==0.27.2
+peft==0.10.0
+pandas==2.2.1
+scikit-learn==1.4.1.post1
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+tqdm==4.66.2
