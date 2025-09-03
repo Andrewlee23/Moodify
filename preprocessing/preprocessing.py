@@ -56,8 +56,19 @@ go_clean = pd.DataFrame(rows)
 dataset = pd.concat([kaggle, go_clean], ignore_index=True)
 dataset = dataset.dropna().sample(frac=1).reset_index(drop=True)
 
+final_label_map = {
+    "angry": 0,
+    "happy": 1,
+    "fear": 2,
+    "sad": 3,
+    "disgusted": 4,
+    "silly": 5
+}
+
+dataset["label"] = dataset["label"].map(final_label_map)
+
 dataset.to_csv(OUTPUT_PATH, index=False)
 
-print(f"dataset saved to {OUTPUT_PATH} with {len(dataset)} rows")
+print(f"Dataset saved to {OUTPUT_PATH} with {len(dataset)} rows")
 print(dataset['label'].value_counts())
 print(dataset.head())
