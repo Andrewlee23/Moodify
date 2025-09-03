@@ -1,6 +1,12 @@
 .App {
   text-align: center;
 }
+@font-face {
+  font-family: 'Cutive Mono';
+  src: url('./fonts/CutiveMono-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
 
 .App-logo {
   height: 40vmin;
@@ -27,6 +33,12 @@
 .App-link {
   color: #61dafb;
 }
+body {
+  font-family: 'Cutive Mono', monospace;
+  background-color: #000; 
+  color: #fff;
+}
+
 
 @keyframes App-logo-spin {
   from {

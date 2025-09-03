@@ -1,4 +1,5 @@
 backend/model/moodify_model/
+backend/.env
 *.zip
 *.bin
 

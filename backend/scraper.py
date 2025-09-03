@@ -53,8 +53,9 @@ def save_post(source: str, content: str, pred: dict):
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute(
-            "INSERT INTO posts (source, content, prediction) VALUES (?, ?, ?)",
-            (source, content, label)  
+
+            "INSERT INTO posts (source, text, label) VALUES (?, ?, ?)",
+            (source, content, label)
         )
         conn.commit()
         conn.close()

@@ -1,23 +1,30 @@
-import logo from './logo.svg';
-import './App.css';
+import React from "react";
+import { TypeAnimation } from "react-type-animation";
+import MoodChart from "./MoodChart";
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div style={{
+      background: "#000",
+      color: "#fff",
+      height: "100vh",
+      padding: "2rem",
+      fontFamily: "Cutive Mono, monospace"
+    }}>
+      <TypeAnimation
+        sequence={["Moodify", 1000]}
+        wrapper="h1"
+        cursor={true}
+        style={{ whiteSpace: "pre-line", display: "block" }}
+      />
+      <TypeAnimation
+        sequence={[2000, "How is the world feeling today?", 2000]}
+        wrapper="h2"
+        cursor={true}
+        style={{ whiteSpace: "pre-line", display: "block" }}
+      />
+
+      <MoodChart />
     </div>
   );
 }
